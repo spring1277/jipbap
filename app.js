@@ -95,6 +95,32 @@ function toast(msg) {
 }
 function todayDay() { return DAYS[(new Date().getDay() + 6) % 7]; }
 
+/* 앱 내부 텍스트 입력창 — 설치형 PWA에서 window.prompt가 안 뜨는 문제 대체 */
+function askText(opts) {
+  const o = opts || {};
+  return new Promise((resolve) => {
+    const ov = document.createElement('div');
+    ov.className = 'ask-overlay';
+    ov.innerHTML = `<div class="ask-box">
+      <div class="ask-title">${esc(o.title || '입력')}</div>
+      ${o.label ? `<div class="ask-label">${esc(o.label)}</div>` : ''}
+      <input type="text" class="ask-input" value="${esc(o.value || '')}" placeholder="${esc(o.placeholder || '')}">
+      <div class="ask-actions">
+        <button type="button" class="btn ghost small ask-cancel">취소</button>
+        <button type="button" class="btn small green ask-ok">확인</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const input = ov.querySelector('.ask-input');
+    const done = (v) => { ov.remove(); resolve(v); };
+    ov.querySelector('.ask-ok').addEventListener('click', () => done(input.value));
+    ov.querySelector('.ask-cancel').addEventListener('click', () => done(null));
+    ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); done(input.value); } });
+    setTimeout(() => input.focus(), 60);
+  });
+}
+
 /* ---------- 초기화 ---------- */
 async function init() {
   await loadState();
@@ -211,12 +237,18 @@ function viewHome() {
     const day = state.plan[d] || {};
     const slots = SLOTS.map(([key, label]) => {
       const v = day[key];
-      let text = '＋', cls = 'empty';
-      if (typeof v === 'string') { const r = state.recipes.find((x) => x.id === v); if (r) { text = r.title; cls = ''; } }
-      else if (v && v.s) { text = '💡 ' + v.s; cls = 'suggest'; }
+      let mainRef, sides = [];
+      if (v && typeof v === 'object' && 'main' in v) { mainRef = v.main; sides = v.sides || []; }
+      else { mainRef = v; } // 레거시: 단일 참조(id 또는 {s})
+      const mi = refInfo(mainRef);
+      const text = mi ? (mi.kind === 'suggest' ? '💡 ' + mi.text : mi.text) : '＋';
+      const cls = !mi ? 'empty' : (mi.kind === 'suggest' ? 'suggest' : '');
+      const sideInfos = sides.map(refInfo).filter(Boolean);
+      const sidesHtml = sideInfos.length ? `<div class="slot-sides">+ ${sideInfos.map((s) => esc(s.text)).join(' · ')}</div>` : '';
       return `<div class="plan-slot" data-day="${d}" data-slot="${key}">
         <div class="slot-label">${label}</div>
         <div class="slot-menu ${cls}">${esc(text)}</div>
+        ${sidesHtml}
       </div>`;
     }).join('');
     return `<div class="plan-day ${d === today ? 'today' : ''}">
@@ -294,51 +326,73 @@ const SUGGEST_BREAKFAST = ['김치볶음밥', '참치마요덮밥', '계란죽',
 const SUGGEST_DINNER = ['불고기', '된장찌개', '김치찌개', '제육볶음', '소불고기', '고등어구이', '갈치조림', '닭볶음탕', '순두부찌개', '계란찜', '유부초밥', '김밥', '돈까스', '생선구이', '시래기국', '부대찌개', '갈비찜'];
 const SUGGEST_LUNCH = ['비빔밥', '잔치국수', '비빔국수', '볶음우동', '오므라이스', '제육덮밥', '김밥', '카레라이스', '치킨마요덮밥', '냉면'];
 function suggestFor(meal) { return meal === 'breakfast' ? SUGGEST_BREAKFAST : meal === 'dinner' ? SUGGEST_DINNER : SUGGEST_LUNCH; }
+
+/* 메인으로 쓸 카테고리(반찬·간식 제외) / 곁들임(반찬) 추천 목록 */
+const MAIN_CATS = ['국·찌개', '한식', '중식', '일식', '양식', '분식'];
+const SIDE_SUGGEST = ['김치', '시금치나물', '콩나물무침', '무생채', '계란말이', '애호박볶음', '오이무침', '멸치볶음', '진미채무침', '어묵볶음', '김구이', '장조림', '도라지무침', '깍두기'];
 /* 이름 정규화(괄호·공백 제거)로 레시피/추천 간 중복 판정 */
 const normName = (s) => (s || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '').trim();
 
-/* 끼니별 후보 레시피 풀 (아침=볶음밥·죽·스파게티·또띠아 등, 저녁=든든함, 점심=전체) */
-function poolForMeal(meal) {
+/* 메인 요리 풀 (반찬·간식 제외) — 아침=볶음밥·죽·스파게티·또띠아·주먹밥·떡국 등 */
+function mainPool(meal) {
   const all = state.recipes;
   const t = (r) => (r.tags || []).join(' ');
   const has = (r, kw) => kw.some((k) => (r.title || '').includes(k) || t(r).includes(k));
-  const min = (r) => Number(r.timeMin) || 999;
-  if (meal === 'breakfast') {
-    let pool = all.filter((r) => has(r, BREAKFAST_KEYWORDS));
-    if (pool.length < 1) pool = all.filter((r) => min(r) <= 20 || has(r, ['간단', '15분', '간식']) || ['반찬', '분식', '간식·베이킹', '양식'].includes(r.category));
-    return pool.length ? pool : all;
-  }
-  if (meal === 'dinner') {
-    const pool = all.filter((r) => r.category !== '간식·베이킹' && (['국·찌개', '한식', '중식', '일식', '양식'].includes(r.category) || has(r, ['든든한', '손님상', '가족최애'])));
-    return pool.length ? pool : all;
-  }
-  return all;
+  if (meal === 'breakfast') return all.filter((r) => has(r, BREAKFAST_KEYWORDS));
+  return all.filter((r) => MAIN_CATS.includes(r.category)); // 점심·저녁 메인
+}
+/* 곁들임(반찬) 풀 — 내 반찬 레시피 */
+function sidePool() { return state.recipes.filter((r) => r.category === '반찬'); }
+
+/* 슬롯 참조(레시피 id 문자열 | {s:이름}) → 표시 정보 */
+function refInfo(ref) {
+  if (ref == null) return null;
+  if (typeof ref === 'string') { const r = state.recipes.find((x) => x.id === ref); return r ? { text: r.title, kind: 'recipe' } : null; }
+  if (ref.s) return { text: ref.s, kind: 'suggest' };
+  return null;
 }
 
-/* 일주일 자동 추천 — 주간 전역 중복 제거. 내 레시피가 부족하면 인기·적합 메뉴(💡)로 채움 */
+/* 일주일 자동 추천 — 끼니마다 '메인' + '곁들임(반찬)'. 메인은 주간 중복 없음 */
 async function recommendWeek() {
   const meals = state.planMeals;
-  const queues = {}, sugQueues = {};
-  meals.forEach((m) => { queues[m] = shuffle(poolForMeal(m)); sugQueues[m] = shuffle(suggestFor(m)); });
-  const used = new Set();       // 이번 주 사용 메뉴 이름(정규화) — 레시피·추천 통합
+  const mainQ = {}, mainSug = {};
+  meals.forEach((m) => { mainQ[m] = shuffle(mainPool(m)); mainSug[m] = shuffle(suggestFor(m)); });
+
+  // 곁들임 덱: 내 반찬 레시피 + 반찬 추천(이름 중복 제외), 섞어서 순환 사용(주중 반복 허용)
+  const sideNames = new Set(sidePool().map((r) => normName(r.title)));
+  const sideDeck = shuffle([...sidePool().map((r) => r.id), ...SIDE_SUGGEST.filter((s) => !sideNames.has(normName(s))).map((s) => ({ s }))]);
+  let sideCur = 0;
+  const nextSide = (exclude) => {
+    for (let n = 0; n < sideDeck.length; n++) {
+      const ref = sideDeck[(sideCur + n) % sideDeck.length];
+      const info = refInfo(ref);
+      if (info && !exclude.has(normName(info.text))) { sideCur = (sideCur + n + 1) % sideDeck.length; return { ref, name: normName(info.text) }; }
+    }
+    return null;
+  };
+
+  const usedMains = new Set(); // 메인은 일주일 내 중복 없음
   const plan = {};
-  let sugCount = 0;
   DAYS.forEach((d) => {
     plan[d] = Object.assign({}, state.plan[d]); // 추천에서 뺀 끼니(예: 점심)는 기존 값 유지
     meals.forEach((m) => {
-      // 1) 내 레시피 중 아직 안 쓴 것
-      const r = queues[m].find((x) => !used.has(normName(x.title)));
-      if (r) { plan[d][m] = r.id; used.add(normName(r.title)); return; }
-      // 2) 없으면 인기·적합 메뉴 추천으로 채움
-      const sug = sugQueues[m].find((n) => !used.has(normName(n)));
-      if (sug) { plan[d][m] = { s: sug }; used.add(normName(sug)); sugCount++; return; }
-      delete plan[d][m];
+      let mainRef = null, mainName = null;
+      const r = mainQ[m].find((x) => !usedMains.has(normName(x.title)));
+      if (r) { mainRef = r.id; mainName = normName(r.title); }
+      else { const sug = mainSug[m].find((n) => !usedMains.has(normName(n))); if (sug) { mainRef = { s: sug }; mainName = normName(sug); } }
+      if (mainRef == null) { delete plan[d][m]; return; }
+      usedMains.add(mainName);
+      const sideCount = m === 'dinner' ? 2 : 1;   // 저녁 2가지, 그 외 1가지 곁들임
+      const exclude = new Set([mainName]);
+      const sides = [];
+      for (let k = 0; k < sideCount; k++) { const s = nextSide(exclude); if (s) { sides.push(s.ref); exclude.add(s.name); } }
+      plan[d][m] = { main: mainRef, sides };
     });
   });
   state.plan = plan;
   await DB.setKV('plan', state.plan);
   render();
-  toast(sugCount ? `일주일 식단 추천 완료 🎲 (💡 표시는 추천 메뉴 ${sugCount}개)` : '일주일 식단을 추천했어요 🎲');
+  toast('일주일 식단 추천 완료 🎲 (메인 + 곁들임 반찬)');
 }
 
 async function clearWeek() {
@@ -352,9 +406,9 @@ async function clearWeek() {
 function trimEmoji(s) { return [...(s || '').trim()].slice(0, 8).join('') || '🙂'; }
 
 async function addMember() {
-  const name = prompt('가족 구성원 이름을 입력하세요 (예: 아빠, 첫째)');
-  if (!name || !name.trim()) return;
-  const emoji = prompt('이모지 하나로 표시할까요? (예: 👨🏻 👩🏻 👧🏻 👦🏻)', '🙂');
+  const name = await askText({ title: '가족 추가', label: '이름', placeholder: '예: 아빠, 첫째' });
+  if (name === null || !name.trim()) return;
+  const emoji = await askText({ title: '이모지 선택', label: '한 글자 이모지로 표시', value: '🙂', placeholder: '👨🏻 👩🏻 👧🏻 👦🏻' });
   state.family.push({ name: name.trim(), emoji: trimEmoji(emoji) });
   await DB.setKV('family', state.family);
   render();
@@ -363,9 +417,9 @@ async function addMember() {
 async function editMember(i) {
   const m = state.family[i];
   if (!m) return;
-  const name = prompt('이름 수정', m.name);
+  const name = await askText({ title: '이름 수정', value: m.name });
   if (name === null) return;
-  const emoji = prompt('이모지 수정 (예: 👨🏻 👩🏻 👧🏻 👦🏻)', m.emoji || '🙂');
+  const emoji = await askText({ title: '이모지 수정', label: '예: 👨🏻 👩🏻 👧🏻 👦🏻', value: m.emoji || '🙂' });
   const oldName = m.name;
   m.name = (name.trim() || m.name);
   m.emoji = trimEmoji(emoji);
@@ -403,7 +457,9 @@ function openPlanPicker() {
   const { day, slot } = state.planPick;
   const label = SLOTS.find((s) => s[0] === slot)[1];
   const cur = (state.plan[day] || {})[slot];
-  const curName = cur && cur.s ? cur.s : null; // 추천/직접입력 메뉴 이름
+  const mainRef = (cur && typeof cur === 'object' && 'main' in cur) ? cur.main : cur;
+  const mi = refInfo(mainRef);
+  const curName = mi ? mi.text : null; // 웹 검색용 메인 메뉴 이름
   $('#modal-title').textContent = `${day}요일 ${label} 메뉴`;
   $('#modal-save').style.display = 'none';
   $('#modal-cancel').textContent = '닫기';
@@ -435,7 +491,7 @@ function openPlanPicker() {
   }));
   const textBtn = $('[data-pick-text]', $('#modal-body'));
   if (textBtn) textBtn.addEventListener('click', async () => {
-    const name = prompt('메뉴 이름을 입력하세요 (예: 떡국)', curName || '');
+    const name = await askText({ title: '메뉴 직접 입력', placeholder: '예: 떡국', value: curName || '' });
     if (name === null || !name.trim()) return;
     state.plan[day] = state.plan[day] || {};
     state.plan[day][slot] = { s: name.trim() };

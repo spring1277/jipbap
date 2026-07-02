@@ -235,6 +235,7 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .plan-slot .slot-menu { font-size: 13px; font-weight: 600; }
 .plan-slot .slot-menu.empty { color: #c8bdb2; font-weight: 400; }
 .plan-slot .slot-menu.suggest { color: #2f9e57; font-weight: 600; }
+.plan-slot .slot-sides { font-size: 10.5px; color: #9a8f86; margin-top: 3px; line-height: 1.35; }
 
 /* ===== 폼 / 모달 ===== */
 .modal {
@@ -321,5 +322,15 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
   transition: opacity 0.25s; max-width: 88%; text-align: center;
 }
 .toast.hidden { opacity: 0; pointer-events: none; }
+
+/* 앱 내부 입력창 */
+.ask-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(40,25,15,0.45); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.ask-box { background: #fff; width: 100%; max-width: 340px; border-radius: 16px; padding: 18px; box-shadow: 0 8px 30px rgba(0,0,0,0.28); }
+.ask-title { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+.ask-label { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 8px; }
+.ask-input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; outline: none; }
+.ask-input:focus { border-color: var(--header-green); }
+.ask-actions { display: flex; gap: 10px; margin-top: 14px; }
+.ask-actions .btn { flex: 1; }
 
 .hidden { display: none !important; }
