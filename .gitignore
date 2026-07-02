@@ -1,0 +1,8 @@
+# 개인 원본(레시피 스캔·사진·텍스트)은 공개 배포에서 제외
+import_source/
+
+# 임시 파일
+*.tmp
+lens*.pdf
+.DS_Store
+Thumbs.db
