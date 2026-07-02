@@ -264,6 +264,11 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 }
 .field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); }
+
+.paste-box { background: #f2faf4; border: 1px solid #cfe9d6; border-radius: 12px; padding: 12px; margin-bottom: 18px; }
+.paste-box label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--ink); }
+.paste-box textarea { width: 100%; border: 1px solid #cfe9d6; border-radius: 10px; padding: 10px 12px; min-height: 108px; resize: vertical; outline: none; line-height: 1.55; background: #fff; }
+.paste-box textarea:focus { border-color: var(--header-green); }
 .row-2 { display: flex; gap: 10px; }
 .row-2 .field { flex: 1; }
 

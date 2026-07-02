@@ -592,6 +592,69 @@ function bindDetail() {
 }
 
 /* ==========================================================================
+   텍스트 붙여넣기 → 레시피 자동 정리 (오프라인, 규칙 기반)
+   ========================================================================== */
+function splitAmount(raw) {
+  const item = raw.replace(/^[\s\-•·▪◦*]+/, '').replace(/[:：]\s*$/, '').trim();
+  let m = item.match(/^(.+?)\s*[:：]\s*(.+)$/);            // '이름 : 분량'
+  if (m) return { name: m[1].trim(), amount: m[2].trim() };
+  m = item.match(/^(.+?)\s+((?:[\d０-９]|반|약간|적당량|조금|소량|한|½|¼|⅓|¾|기호).*)$/); // '이름 분량'
+  if (m) return { name: m[1].trim(), amount: m[2].trim() };
+  return { name: item, amount: '' };
+}
+
+function guessCategory(title) {
+  const t = title || '';
+  const map = [
+    [/(찌개|국\b|탕|전골|스프|수프)/, '국·찌개'],
+    [/(케이크|쿠키|빵|파이|잼|타르트|마카롱|베이킹|스콘|머핀|디저트|갈레트)/, '간식·베이킹'],
+    [/(파스타|스파게티|리조또|스테이크|그라탕|샐러드|피자|리소토)/, '양식'],
+    [/(초밥|우동|돈부리|규동|라멘|텐동|유부초밥)/, '일식'],
+    [/(짜장|짬뽕|탕수육|마파|깐풍|유린기)/, '중식'],
+    [/(볶음밥|비빔밥|덮밥|주먹밥|불고기|잡채|제육|떡국|수육|미역국)/, '한식'],
+    [/(떡볶이|김밥|라면|순대|만두|토스트)/, '분식'],
+    [/(무침|나물|조림|볶음|구이|장아찌|절임|전\b|계란|김치|찜)/, '반찬']
+  ];
+  for (const [re, c] of map) if (re.test(t)) return c;
+  return '한식';
+}
+
+function parseRecipeText(text) {
+  const out = { title: '', category: '', ingredients: [], steps: [], memo: '' };
+  const lines = (text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return out;
+
+  const ingHeader = /^(?:\[?\s*재료\s*\]?|주재료|부재료|재료\s*및.*)\s*[:：]?\s*(.*)$/;
+  const seasoningHeader = /^(?:\[?\s*(?:양념|양념장|소스|양념재료)\s*\]?)\s*[:：]?\s*(.*)$/;
+  const stepHeader = /^(?:\[?\s*(?:조리\s*(?:법|과정|순서|방법)?|만드는\s*법|만들기|순서|레시피|요리순서)\s*\]?)\s*[:：]?\s*(.*)$/;
+
+  let section = null, ingPrefix = '', started = false;
+  const pushIng = (str, prefix) => str.split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach((it) => {
+    const a = splitAmount(it);
+    if (a.name) out.ingredients.push({ name: (prefix ? prefix + ' ' : '') + a.name, amount: a.amount });
+  });
+  const pushSteps = (str) => str.split(/(?=(?:\d+\s*[.)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫])\s)/).map((s) => s.trim()).filter(Boolean).forEach((s) => {
+    const c = s.replace(/^\s*(?:\d+\s*[.)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫]|[-•·*])\s*/, '').trim();
+    if (c) out.steps.push(c);
+  });
+
+  lines.forEach((line) => {
+    let m;
+    if ((m = line.match(ingHeader))) { section = 'ing'; ingPrefix = ''; started = true; if (m[1]) pushIng(m[1], ''); return; }
+    if ((m = line.match(seasoningHeader))) { section = 'ing'; ingPrefix = '[양념]'; started = true; if (m[1]) pushIng(m[1], ingPrefix); return; }
+    if ((m = line.match(stepHeader))) { section = 'step'; started = true; if (m[1]) pushSteps(m[1]); return; }
+    if (!out.title && !started) { out.title = line; return; }   // 첫 줄 = 제목
+    if (section === 'ing') pushIng(line, ingPrefix);
+    else if (section === 'step') pushSteps(line);
+    else out.memo += (out.memo ? '\n' : '') + line;             // 헤더 밖 텍스트 → 메모
+  });
+
+  if (!out.title) out.title = lines[0];
+  out.category = guessCategory(out.title);
+  return out;
+}
+
+/* ==========================================================================
    레시피 편집 모달
    ========================================================================== */
 function openEditor(recipe) {
@@ -612,6 +675,18 @@ function openEditor(recipe) {
     : '<span class="section-sub">가족·식단 탭에서 가족을 먼저 추가하면 여기서 표시돼요.</span>';
 
   $('#modal-body').innerHTML = `
+    <div class="paste-box">
+      <label>📋 텍스트로 빠르게 채우기 <span class="hint">카톡·블로그·메모의 레시피 글을 붙여넣고 자동 정리</span></label>
+      <textarea id="paste-text" placeholder="여기에 레시피 글 전체를 붙여넣으세요.
+
+예)
+김치찌개
+재료: 신김치 1/4포기, 돼지고기 200g, 두부 1/2모, 대파 1대
+만드는 법
+1. 김치와 고기를 볶는다.
+2. 물을 붓고 끓인다."></textarea>
+      <button type="button" class="btn small green" id="paste-run" style="margin-top:8px">✨ 자동 정리해서 아래에 채우기</button>
+    </div>
     <div class="field">
       <label>메뉴 이름</label>
       <input type="text" id="f-title" value="${esc(r.title)}" placeholder="예: 엄마표 김치찌개">
@@ -671,6 +746,19 @@ function openEditor(recipe) {
   $('#f-photo').addEventListener('change', onPhotoPick);
   const clr = $('#f-photo-clear');
   if (clr) clr.addEventListener('click', () => { r.photo = null; openEditor(r); });
+  $('#paste-run').addEventListener('click', () => {
+    const txt = $('#paste-text').value;
+    if (!txt.trim()) { toast('붙여넣은 텍스트가 없어요'); return; }
+    const p = parseRecipeText(txt);
+    if (p.title && !r.title) r.title = p.title;
+    else if (p.title) r.title = p.title;
+    if (p.category) r.category = p.category;
+    if (p.ingredients.length) r.ingredients = p.ingredients;
+    if (p.steps.length) r.steps = p.steps;
+    if (p.memo) r.memo = (r.memo ? r.memo + '\n' : '') + p.memo;
+    openEditor(r); // 채워진 값으로 폼 다시 그림
+    toast(`자동 정리 완료 — 재료 ${p.ingredients.length}·순서 ${p.steps.length}개 (확인 후 저장)`);
+  });
 
   showModal();
   setTimeout(() => $('#f-title').focus(), 100);
