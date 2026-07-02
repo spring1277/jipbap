@@ -7,6 +7,7 @@
   --accent: #e8552d;
   --accent-soft: #fdeee8;
   --accent-ink: #b8380f;
+  --header-green: #4caf50;
   --green: #4a9d5b;
   --shadow: 0 2px 12px rgba(150, 90, 40, 0.08);
   --radius: 16px;
@@ -37,9 +38,9 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
   padding-top: var(--safe-top);
   display: flex; align-items: center; justify-content: space-between;
   padding-left: 18px; padding-right: 14px;
-  background: var(--accent);
+  background: var(--header-green);
   color: #fff;
-  box-shadow: 0 2px 10px rgba(232, 85, 45, 0.28);
+  box-shadow: 0 2px 10px rgba(60, 150, 70, 0.3);
 }
 .app-header h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -0.3px; }
 .header-add {
@@ -196,7 +197,15 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .family-strip::-webkit-scrollbar { display: none; }
 .member-chip {
   flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
-  min-width: 62px;
+  min-width: 62px; position: relative;
+}
+.member-chip.editing .member-avatar { animation: wiggle 0.4s ease-in-out infinite; }
+@keyframes wiggle { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+.member-del {
+  position: absolute; top: -4px; right: 6px; z-index: 2;
+  width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: #e8552d; color: #fff; font-size: 12px; line-height: 1;
+  display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
 .member-avatar {
   width: 52px; height: 52px; border-radius: 50%; background: var(--accent-soft);

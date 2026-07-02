@@ -66,6 +66,7 @@ const state = {
   plan: {},              // { '월': {breakfast, lunch, dinner: recipeId} , ... }
   filterCat: '전체',
   activeMember: null,    // 가족 필터
+  familyEdit: false,     // 가족 편집 모드
   planMeals: ['breakfast', 'dinner'],  // 자동 추천에 포함할 끼니
   detailId: null,
   editing: null,         // 편집 중인 recipe 또는 null(신규)
@@ -172,8 +173,10 @@ function recipeCardHTML(r) {
    ========================================================================== */
 function viewHome() {
   // 가족별 최애 메뉴
-  const memberStrip = state.family.map((m) =>
-    `<div class="member-chip ${state.activeMember === m.name ? 'active' : ''}" data-member="${esc(m.name)}">
+  const editing = state.familyEdit;
+  const memberStrip = state.family.map((m, i) =>
+    `<div class="member-chip ${state.activeMember === m.name ? 'active' : ''} ${editing ? 'editing' : ''}" data-member-idx="${i}">
+      ${editing ? `<button class="member-del" data-member-del="${i}">✕</button>` : ''}
       <div class="member-avatar">${esc(m.emoji || '🙂')}</div>
       <div class="m-name">${esc(m.name)}</div>
     </div>`).join('') +
@@ -211,7 +214,9 @@ function viewHome() {
     `<button class="filter-pill ${state.planMeals.includes(key) ? 'active' : ''}" data-meal="${key}">${label}</button>`).join('');
 
   return `
-    <div class="section-title">👨‍👩‍👧 가족이 좋아하는 메뉴</div>
+    <div class="section-title">👨‍👩‍👧 가족이 좋아하는 메뉴
+      <button class="link-btn" id="fam-edit" style="margin-left:auto;font-size:13px">${editing ? '완료' : '편집'}</button>
+    </div>
     <div class="family-strip">${memberStrip}</div>
     <div style="margin-top:12px">${favList}</div>
 
@@ -231,11 +236,17 @@ function viewHome() {
 }
 
 function bindHome() {
-  $$('[data-member]').forEach((el) => el.addEventListener('click', () => {
-    const n = el.dataset.member;
+  $$('[data-member-idx]').forEach((el) => el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-member-del]')) return; // 삭제 버튼은 별도 처리
+    const i = +el.dataset.memberIdx;
+    if (state.familyEdit) { editMember(i); return; }
+    const n = state.family[i].name;
     state.activeMember = state.activeMember === n ? null : n;
     render();
   }));
+  $$('[data-member-del]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); deleteMember(+b.dataset.memberDel); }));
+  const editBtn = $('#fam-edit');
+  if (editBtn) editBtn.addEventListener('click', () => { state.familyEdit = !state.familyEdit; render(); });
   const addBtn = $('[data-member-add]');
   if (addBtn) addBtn.addEventListener('click', addMember);
   $$('[data-meal]').forEach((b) => b.addEventListener('click', () => toggleMeal(b.dataset.meal)));
@@ -260,43 +271,49 @@ function shuffle(arr) {
   return a;
 }
 
-/* 끼니별 후보 레시피 풀 (아침=간단·가벼움, 저녁=든든함, 점심=전체) */
+/* 아침으로 즐겨 먹는 메뉴 키워드 (볶음밥·죽·스파게티·또띠아 등) */
+const BREAKFAST_KEYWORDS = ['죽', '볶음밥', '스파게티', '파스타', '또띠아', '또띠야', '리조또', '토스트', '오믈렛', '계란', '샌드위치', '시리얼', '누룽지', '오트밀'];
+
+/* 끼니별 후보 레시피 풀 (아침=볶음밥·죽·스파게티·또띠아 등, 저녁=든든함, 점심=전체) */
 function poolForMeal(meal) {
   const all = state.recipes;
-  const t = (r) => r.tags || [];
+  const t = (r) => (r.tags || []).join(' ');
+  const has = (r, kw) => kw.some((k) => (r.title || '').includes(k) || t(r).includes(k));
   const min = (r) => Number(r.timeMin) || 999;
-  let pool = all;
   if (meal === 'breakfast') {
-    pool = all.filter((r) => min(r) <= 20 || ['간단', '15분', '간식'].some((x) => t(r).includes(x)) || ['반찬', '분식', '간식·베이킹', '양식'].includes(r.category));
-  } else if (meal === 'dinner') {
-    pool = all.filter((r) => ['국·찌개', '한식', '중식', '일식'].includes(r.category) || ['든든한', '손님상', '가족최애'].some((x) => t(r).includes(x)));
+    let pool = all.filter((r) => has(r, BREAKFAST_KEYWORDS));
+    if (pool.length < 1) pool = all.filter((r) => min(r) <= 20 || has(r, ['간단', '15분', '간식']) || ['반찬', '분식', '간식·베이킹', '양식'].includes(r.category));
+    return pool.length ? pool : all;
   }
-  return pool.length >= 2 ? pool : all; // 후보가 너무 적으면 전체로 대체
+  if (meal === 'dinner') {
+    const pool = all.filter((r) => r.category !== '간식·베이킹' && (['국·찌개', '한식', '중식', '일식', '양식'].includes(r.category) || has(r, ['든든한', '손님상', '가족최애'])));
+    return pool.length ? pool : all;
+  }
+  return all;
 }
 
-/* 일주일 아침·저녁(선택 끼니) 자동 추천 */
+/* 일주일 자동 추천 — 일주일 안에서 메뉴가 절대 겹치지 않게(전역 중복 제거) */
 async function recommendWeek() {
   if (!state.recipes.length) { toast('먼저 레시피를 추가해 주세요'); return; }
   const meals = state.planMeals;
   const queues = {};
   meals.forEach((m) => { queues[m] = shuffle(poolForMeal(m)); });
+  const used = new Set();       // 이번 주에 이미 쓴 메뉴(끼니 구분 없이 전체)
   const plan = {};
+  let filled = 0, empty = 0;
   DAYS.forEach((d) => {
     plan[d] = Object.assign({}, state.plan[d]); // 추천에서 뺀 끼니(예: 점심)는 기존 값 유지
-    const usedToday = new Set();
     meals.forEach((m) => {
-      if (!queues[m].length) queues[m] = shuffle(poolForMeal(m)); // 다 소진되면 다시 채움(중복 최소화)
-      let idx = queues[m].findIndex((r) => !usedToday.has(r.id));
-      if (idx < 0) idx = 0;
-      const r = queues[m].splice(idx, 1)[0];
-      if (r) { plan[d][m] = r.id; usedToday.add(r.id); }
+      const pick = queues[m].find((r) => !used.has(r.id)); // 아직 안 쓴 메뉴만
+      if (pick) { plan[d][m] = pick.id; used.add(pick.id); filled++; }
+      else { delete plan[d][m]; empty++; } // 겹치지 않게 채울 메뉴가 없으면 비움
     });
   });
   state.plan = plan;
   await DB.setKV('plan', state.plan);
   render();
   const names = meals.map((m) => SLOTS.find((s) => s[0] === m)[1]).join('·');
-  toast(`일주일 ${names} 식단을 추천했어요 🎲`);
+  toast(empty ? `중복 없이 ${filled}칸 채웠어요 (레시피가 부족한 칸은 비움)` : `일주일 ${names} 식단을 추천했어요 🎲`);
 }
 
 async function clearWeek() {
@@ -306,11 +323,47 @@ async function clearWeek() {
   render(); toast('식단을 비웠어요');
 }
 
+/* 이모지를 코드포인트 단위로 안전하게 자르기(피부색·합성 이모지 보존) */
+function trimEmoji(s) { return [...(s || '').trim()].slice(0, 8).join('') || '🙂'; }
+
 async function addMember() {
   const name = prompt('가족 구성원 이름을 입력하세요 (예: 아빠, 첫째)');
   if (!name || !name.trim()) return;
-  const emoji = prompt('이모지 하나로 표시할까요? (예: 👨 👩 🧒 👵)', '🙂') || '🙂';
-  state.family.push({ name: name.trim(), emoji: emoji.trim().slice(0, 2) });
+  const emoji = prompt('이모지 하나로 표시할까요? (예: 👨🏻 👩🏻 👧🏻 👦🏻)', '🙂');
+  state.family.push({ name: name.trim(), emoji: trimEmoji(emoji) });
+  await DB.setKV('family', state.family);
+  render();
+}
+
+async function editMember(i) {
+  const m = state.family[i];
+  if (!m) return;
+  const name = prompt('이름 수정', m.name);
+  if (name === null) return;
+  const emoji = prompt('이모지 수정 (예: 👨🏻 👩🏻 👧🏻 👦🏻)', m.emoji || '🙂');
+  const oldName = m.name;
+  m.name = (name.trim() || m.name);
+  m.emoji = trimEmoji(emoji);
+  // 이름이 바뀌면 레시피의 '가족 최애' 표시도 함께 갱신
+  if (oldName !== m.name) {
+    for (const r of state.recipes) {
+      if ((r.favoriteOf || []).includes(oldName)) {
+        r.favoriteOf = r.favoriteOf.map((n) => (n === oldName ? m.name : n));
+        await DB.putRecipe(r);
+      }
+    }
+    if (state.activeMember === oldName) state.activeMember = m.name;
+  }
+  await DB.setKV('family', state.family);
+  render();
+}
+
+async function deleteMember(i) {
+  const m = state.family[i];
+  if (!m) return;
+  if (!confirm(`'${m.name}' 을(를) 가족에서 삭제할까요?`)) return;
+  if (state.activeMember === m.name) state.activeMember = null;
+  state.family.splice(i, 1);
   await DB.setKV('family', state.family);
   render();
 }

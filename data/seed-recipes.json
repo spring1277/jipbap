@@ -2,15 +2,23 @@
   "family": [
     {
       "name": "아빠",
-      "emoji": "👨"
+      "emoji": "👨🏻"
     },
     {
       "name": "엄마",
-      "emoji": "👩"
+      "emoji": "👩🏻"
     },
     {
       "name": "첫째",
-      "emoji": "🧒"
+      "emoji": "👧🏻"
+    },
+    {
+      "name": "둘째",
+      "emoji": "👧🏻"
+    },
+    {
+      "name": "셋째",
+      "emoji": "👦🏻"
     }
   ],
   "recipes": [

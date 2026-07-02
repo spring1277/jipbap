@@ -1,6 +1,6 @@
 // 집밥 레시피 PWA 서비스워커
 // 배포할 때마다 아래 CACHE_VERSION 숫자만 올리면 이전 캐시가 자동으로 정리됩니다.
-const CACHE_VERSION = 'jipbap-v3';
+const CACHE_VERSION = 'jipbap-v4';
 const APP_SHELL = [
   './',
   './index.html',
