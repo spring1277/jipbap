@@ -11,6 +11,16 @@ const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
 const SLOTS = [['breakfast', '아침'], ['lunch', '점심'], ['dinner', '저녁']];
 const CAT_EMOJI = { '한식': '🍚', '국·찌개': '🍲', '반찬': '🥢', '분식': '🍜', '양식': '🍝', '중식': '🥡', '일식': '🍱', '간식·베이킹': '🧁', '기타': '🍽️' };
 
+/* 가족 아바타 색 링 — 같은 이모지여도 구성원마다 다르게 보이도록 */
+const AVATAR_COLORS = [
+  { bg: '#e3f0ff', ring: '#5b9bd5' }, // 파랑
+  { bg: '#ffe6ef', ring: '#e5739a' }, // 분홍
+  { bg: '#efe6ff', ring: '#9b6fd4' }, // 보라
+  { bg: '#e2f6ec', ring: '#4caf50' }, // 초록
+  { bg: '#fff1de', ring: '#e8952d' }, // 주황
+  { bg: '#e4f6f7', ring: '#40b0bd' }  // 청록
+];
+
 /* 웹 검색 대상 사이트 (API 키 불필요, 검색어를 넘겨 새 탭으로 열기) */
 const WEB_SITES = [
   { name: '만개의레시피', emoji: '🍳', desc: '국내 최대 레시피 커뮤니티', url: (q) => `https://www.10000recipe.com/recipe/list.html?q=${encodeURIComponent(q)}` },
@@ -174,12 +184,14 @@ function recipeCardHTML(r) {
 function viewHome() {
   // 가족별 최애 메뉴
   const editing = state.familyEdit;
-  const memberStrip = state.family.map((m, i) =>
-    `<div class="member-chip ${state.activeMember === m.name ? 'active' : ''} ${editing ? 'editing' : ''}" data-member-idx="${i}">
+  const memberStrip = state.family.map((m, i) => {
+    const c = AVATAR_COLORS[i % AVATAR_COLORS.length];
+    return `<div class="member-chip ${state.activeMember === m.name ? 'active' : ''} ${editing ? 'editing' : ''}" data-member-idx="${i}">
       ${editing ? `<button class="member-del" data-member-del="${i}">✕</button>` : ''}
-      <div class="member-avatar">${esc(m.emoji || '🙂')}</div>
+      <div class="member-avatar" style="background:${c.bg};box-shadow:inset 0 0 0 2.5px ${c.ring}">${esc(m.emoji || '🙂')}</div>
       <div class="m-name">${esc(m.name)}</div>
-    </div>`).join('') +
+    </div>`;
+  }).join('') +
     `<div class="member-chip add" data-member-add="1"><div class="member-avatar">＋</div><div class="m-name">추가</div></div>`;
 
   let favList;
