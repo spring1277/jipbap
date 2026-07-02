@@ -234,6 +234,7 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .plan-slot .slot-label { font-size: 10.5px; color: var(--ink-soft); font-weight: 700; margin-bottom: 4px; }
 .plan-slot .slot-menu { font-size: 13px; font-weight: 600; }
 .plan-slot .slot-menu.empty { color: #c8bdb2; font-weight: 400; }
+.plan-slot .slot-menu.suggest { color: #2f9e57; font-weight: 600; }
 
 /* ===== 폼 / 모달 ===== */
 .modal {

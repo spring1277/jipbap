@@ -210,10 +210,13 @@ function viewHome() {
   const planHTML = DAYS.map((d) => {
     const day = state.plan[d] || {};
     const slots = SLOTS.map(([key, label]) => {
-      const r = day[key] ? state.recipes.find((x) => x.id === day[key]) : null;
+      const v = day[key];
+      let text = '＋', cls = 'empty';
+      if (typeof v === 'string') { const r = state.recipes.find((x) => x.id === v); if (r) { text = r.title; cls = ''; } }
+      else if (v && v.s) { text = '💡 ' + v.s; cls = 'suggest'; }
       return `<div class="plan-slot" data-day="${d}" data-slot="${key}">
         <div class="slot-label">${label}</div>
-        <div class="slot-menu ${r ? '' : 'empty'}">${r ? esc(r.title) : '＋'}</div>
+        <div class="slot-menu ${cls}">${esc(text)}</div>
       </div>`;
     }).join('');
     return `<div class="plan-day ${d === today ? 'today' : ''}">
@@ -283,8 +286,16 @@ function shuffle(arr) {
   return a;
 }
 
-/* 아침으로 즐겨 먹는 메뉴 키워드 (볶음밥·죽·스파게티·또띠아 등) */
-const BREAKFAST_KEYWORDS = ['죽', '볶음밥', '스파게티', '파스타', '또띠아', '또띠야', '리조또', '토스트', '오믈렛', '계란', '샌드위치', '시리얼', '누룽지', '오트밀'];
+/* 아침으로 즐겨 먹는 메뉴 키워드 (볶음밥·죽·스파게티·또띠아·주먹밥 등) */
+const BREAKFAST_KEYWORDS = ['죽', '볶음밥', '주먹밥', '스파게티', '파스타', '또띠아', '또띠야', '리조또', '토스트', '오믈렛', '계란', '샌드위치', '시리얼', '누룽지', '오트밀'];
+
+/* 내 레시피가 부족할 때 채워 넣을 인기·적합 메뉴 (💡 추천으로 표시) */
+const SUGGEST_BREAKFAST = ['김치볶음밥', '참치마요덮밥', '계란죽', '전복죽', '토마토 스파게티', '크림 스파게티', '베이컨 또띠아', '참치주먹밥', '멸치주먹밥', '삼각김밥', '프렌치토스트', '오트밀', '계란토스트', '북엇국', '스팸김치볶음밥'];
+const SUGGEST_DINNER = ['된장찌개', '김치찌개', '제육볶음', '소불고기', '고등어구이', '갈치조림', '닭볶음탕', '순두부찌개', '계란찜', '유부초밥', '김밥', '돈까스', '생선구이', '시래기국', '부대찌개', '갈비찜'];
+const SUGGEST_LUNCH = ['비빔밥', '잔치국수', '비빔국수', '볶음우동', '오므라이스', '제육덮밥', '김밥', '카레라이스', '치킨마요덮밥', '냉면'];
+function suggestFor(meal) { return meal === 'breakfast' ? SUGGEST_BREAKFAST : meal === 'dinner' ? SUGGEST_DINNER : SUGGEST_LUNCH; }
+/* 이름 정규화(괄호·공백 제거)로 레시피/추천 간 중복 판정 */
+const normName = (s) => (s || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '').trim();
 
 /* 끼니별 후보 레시피 풀 (아침=볶음밥·죽·스파게티·또띠아 등, 저녁=든든함, 점심=전체) */
 function poolForMeal(meal) {
@@ -304,28 +315,30 @@ function poolForMeal(meal) {
   return all;
 }
 
-/* 일주일 자동 추천 — 일주일 안에서 메뉴가 절대 겹치지 않게(전역 중복 제거) */
+/* 일주일 자동 추천 — 주간 전역 중복 제거. 내 레시피가 부족하면 인기·적합 메뉴(💡)로 채움 */
 async function recommendWeek() {
-  if (!state.recipes.length) { toast('먼저 레시피를 추가해 주세요'); return; }
   const meals = state.planMeals;
-  const queues = {};
-  meals.forEach((m) => { queues[m] = shuffle(poolForMeal(m)); });
-  const used = new Set();       // 이번 주에 이미 쓴 메뉴(끼니 구분 없이 전체)
+  const queues = {}, sugQueues = {};
+  meals.forEach((m) => { queues[m] = shuffle(poolForMeal(m)); sugQueues[m] = shuffle(suggestFor(m)); });
+  const used = new Set();       // 이번 주 사용 메뉴 이름(정규화) — 레시피·추천 통합
   const plan = {};
-  let filled = 0, empty = 0;
+  let sugCount = 0;
   DAYS.forEach((d) => {
     plan[d] = Object.assign({}, state.plan[d]); // 추천에서 뺀 끼니(예: 점심)는 기존 값 유지
     meals.forEach((m) => {
-      const pick = queues[m].find((r) => !used.has(r.id)); // 아직 안 쓴 메뉴만
-      if (pick) { plan[d][m] = pick.id; used.add(pick.id); filled++; }
-      else { delete plan[d][m]; empty++; } // 겹치지 않게 채울 메뉴가 없으면 비움
+      // 1) 내 레시피 중 아직 안 쓴 것
+      const r = queues[m].find((x) => !used.has(normName(x.title)));
+      if (r) { plan[d][m] = r.id; used.add(normName(r.title)); return; }
+      // 2) 없으면 인기·적합 메뉴 추천으로 채움
+      const sug = sugQueues[m].find((n) => !used.has(normName(n)));
+      if (sug) { plan[d][m] = { s: sug }; used.add(normName(sug)); sugCount++; return; }
+      delete plan[d][m];
     });
   });
   state.plan = plan;
   await DB.setKV('plan', state.plan);
   render();
-  const names = meals.map((m) => SLOTS.find((s) => s[0] === m)[1]).join('·');
-  toast(empty ? `중복 없이 ${filled}칸 채웠어요 (레시피가 부족한 칸은 비움)` : `일주일 ${names} 식단을 추천했어요 🎲`);
+  toast(sugCount ? `일주일 식단 추천 완료 🎲 (💡 표시는 추천 메뉴 ${sugCount}개)` : '일주일 식단을 추천했어요 🎲');
 }
 
 async function clearWeek() {
