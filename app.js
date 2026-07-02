@@ -287,11 +287,11 @@ function shuffle(arr) {
 }
 
 /* 아침으로 즐겨 먹는 메뉴 키워드 (볶음밥·죽·스파게티·또띠아·주먹밥 등) */
-const BREAKFAST_KEYWORDS = ['죽', '볶음밥', '주먹밥', '스파게티', '파스타', '또띠아', '또띠야', '리조또', '토스트', '오믈렛', '계란', '샌드위치', '시리얼', '누룽지', '오트밀'];
+const BREAKFAST_KEYWORDS = ['죽', '볶음밥', '주먹밥', '떡국', '스파게티', '파스타', '또띠아', '또띠야', '리조또', '토스트', '오믈렛', '계란', '샌드위치', '시리얼', '누룽지', '오트밀'];
 
 /* 내 레시피가 부족할 때 채워 넣을 인기·적합 메뉴 (💡 추천으로 표시) */
-const SUGGEST_BREAKFAST = ['김치볶음밥', '참치마요덮밥', '계란죽', '전복죽', '토마토 스파게티', '크림 스파게티', '베이컨 또띠아', '참치주먹밥', '멸치주먹밥', '삼각김밥', '프렌치토스트', '오트밀', '계란토스트', '북엇국', '스팸김치볶음밥'];
-const SUGGEST_DINNER = ['된장찌개', '김치찌개', '제육볶음', '소불고기', '고등어구이', '갈치조림', '닭볶음탕', '순두부찌개', '계란찜', '유부초밥', '김밥', '돈까스', '생선구이', '시래기국', '부대찌개', '갈비찜'];
+const SUGGEST_BREAKFAST = ['김치볶음밥', '참치마요덮밥', '계란죽', '전복죽', '떡국', '토마토 스파게티', '크림 스파게티', '베이컨 또띠아', '참치주먹밥', '멸치주먹밥', '삼각김밥', '프렌치토스트', '오트밀', '계란토스트', '북엇국', '스팸김치볶음밥'];
+const SUGGEST_DINNER = ['불고기', '된장찌개', '김치찌개', '제육볶음', '소불고기', '고등어구이', '갈치조림', '닭볶음탕', '순두부찌개', '계란찜', '유부초밥', '김밥', '돈까스', '생선구이', '시래기국', '부대찌개', '갈비찜'];
 const SUGGEST_LUNCH = ['비빔밥', '잔치국수', '비빔국수', '볶음우동', '오므라이스', '제육덮밥', '김밥', '카레라이스', '치킨마요덮밥', '냉면'];
 function suggestFor(meal) { return meal === 'breakfast' ? SUGGEST_BREAKFAST : meal === 'dinner' ? SUGGEST_DINNER : SUGGEST_LUNCH; }
 /* 이름 정규화(괄호·공백 제거)로 레시피/추천 간 중복 판정 */
@@ -394,24 +394,38 @@ async function deleteMember(i) {
 }
 
 async function pickForPlan(day, slot) {
-  if (!state.recipes.length) { toast('먼저 레시피를 추가해 주세요'); return; }
   state.planPick = { day, slot };
   openPlanPicker();
 }
 
-/* 식단 배정용 간단 선택 시트 (모달 재사용) */
+/* 식단 배정 시트: 웹 검색(추천 메뉴) + 직접 입력 + 내 레시피 선택 */
 function openPlanPicker() {
   const { day, slot } = state.planPick;
   const label = SLOTS.find((s) => s[0] === slot)[1];
+  const cur = (state.plan[day] || {})[slot];
+  const curName = cur && cur.s ? cur.s : null; // 추천/직접입력 메뉴 이름
   $('#modal-title').textContent = `${day}요일 ${label} 메뉴`;
   $('#modal-save').style.display = 'none';
   $('#modal-cancel').textContent = '닫기';
+
+  const webBlock = curName ? `
+    <div class="section-sub" style="margin:2px 2px 8px">🌐 '${esc(curName)}' 웹에서 레시피 찾기</div>
+    <div class="web-links" style="margin-bottom:16px">
+      ${WEB_SITES.map((s) => `<a class="web-link" href="${s.url(curName)}" target="_blank" rel="noopener"><span class="wl-emoji">${s.emoji}</span><span class="wl-name">${s.name}</span><span class="wl-arrow">↗</span></a>`).join('')}
+    </div>` : '';
   const list = state.recipes.map((r) =>
     `<button class="more-item" data-pick="${r.id}"><span class="mi-icon">${r.photo ? '🍽️' : (CAT_EMOJI[r.category] || '🍽️')}</span>
       <span><b>${esc(r.title)}</b><span class="mi-sub">${esc(r.category || '')}</span></span></button>`).join('');
+
   $('#modal-body').innerHTML = `
-    <button class="more-item" data-pick="__clear__" style="color:#d4380d"><span class="mi-icon">🗑</span><span><b>비우기</b></span></button>
-    <div class="more-group" style="margin-top:10px">${list}</div>`;
+    ${webBlock}
+    <div class="more-group">
+      <button class="more-item" data-pick-text="1"><span class="mi-icon">✏️</span><span><b>직접 입력</b><span class="mi-sub">목록에 없는 메뉴를 텍스트로 추가</span></span></button>
+      <button class="more-item" data-pick="__clear__" style="color:#d4380d"><span class="mi-icon">🗑</span><span><b>비우기</b></span></button>
+    </div>
+    ${list ? `<div class="section-sub" style="margin:16px 2px 8px">내 레시피에서 선택</div><div class="more-group">${list}</div>`
+           : '<div class="empty" style="padding:22px">저장한 레시피가 없어요. 위 "직접 입력"으로 메뉴를 넣어보세요.</div>'}`;
+
   $$('[data-pick]', $('#modal-body')).forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.pick;
     state.plan[day] = state.plan[day] || {};
@@ -419,6 +433,15 @@ function openPlanPicker() {
     await DB.setKV('plan', state.plan);
     closeModal(); render(); toast('식단에 반영했어요');
   }));
+  const textBtn = $('[data-pick-text]', $('#modal-body'));
+  if (textBtn) textBtn.addEventListener('click', async () => {
+    const name = prompt('메뉴 이름을 입력하세요 (예: 떡국)', curName || '');
+    if (name === null || !name.trim()) return;
+    state.plan[day] = state.plan[day] || {};
+    state.plan[day][slot] = { s: name.trim() };
+    await DB.setKV('plan', state.plan);
+    closeModal(); render(); toast('식단에 반영했어요');
+  });
   showModal();
 }
 
