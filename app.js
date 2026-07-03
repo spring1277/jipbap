@@ -224,11 +224,11 @@ function viewHome() {
   if (state.activeMember) {
     const favs = state.recipes.filter((r) => (r.favoriteOf || []).includes(state.activeMember));
     favList = favs.length ? favs.map(recipeCardHTML).join('')
-      : `<div class="empty"><span class="big">💛</span>${esc(state.activeMember)} 님이 좋아하는 메뉴가 아직 없어요.<br>레시피 편집에서 "가족 최애"에 추가해 보세요.</div>`;
+      : `<div class="fav-hint">${esc(state.activeMember)} 님의 최애 메뉴가 아직 없어요 · 레시피에서 💛로 지정</div>`;
   } else {
     const favs = state.recipes.filter((r) => (r.favoriteOf || []).length);
     favList = favs.length ? favs.slice(0, 6).map(recipeCardHTML).join('')
-      : `<div class="empty"><span class="big">🍚</span>가족을 추가하고, 좋아하는 메뉴를 표시해 보세요.</div>`;
+      : `<div class="fav-hint">레시피를 열어 💛 가족 최애로 지정하면 여기 모여요</div>`;
   }
 
   // 이번 주 식단
@@ -265,9 +265,9 @@ function viewHome() {
       <button class="link-btn" id="fam-edit" style="margin-left:auto;font-size:13px">${editing ? '완료' : '편집'}</button>
     </div>
     <div class="family-strip">${memberStrip}</div>
-    <div style="margin-top:12px">${favList}</div>
+    <div style="margin-top:10px">${favList}</div>
 
-    <div class="section-title" style="margin-top:26px">🗓 이번 주 식단 <span class="section-sub">칸을 눌러 직접 지정</span></div>
+    <div class="section-title" style="margin-top:16px">🗓 이번 주 식단 <span class="section-sub">칸을 눌러 직접 지정</span></div>
     <div class="reco-plan card">
       <div class="reco-plan-row">
         <span class="reco-plan-label">추천 끼니</span>
