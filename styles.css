@@ -34,7 +34,8 @@ button { font-family: inherit; cursor: pointer; }
 /* 카페 메뉴판 느낌 — 제목은 명조(세리프) */
 .app-header h1, .section-title, .detail-title, .recipe-meta h3,
 .plan-day-head, .modal-head strong, .ask-title, .detail-block h4, #modal-title {
-  font-family: 'Gowun Batang', 'Nanum Myeongjo', 'Batang', Georgia, serif;
+  font-family: 'Nanum Pen Script', 'Gaegu', 'Gowun Batang', cursive, serif;
+  letter-spacing: .3px;
 }
 input, textarea, select { font-family: inherit; font-size: 16px; }
 
@@ -339,5 +340,15 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .ask-input:focus { border-color: var(--header-green); }
 .ask-actions { display: flex; gap: 10px; margin-top: 14px; }
 .ask-actions .btn { flex: 1; }
+
+/* 손글씨 제목 크기 보정 (Nanum Pen Script는 작게 보임) */
+.app-header h1 { font-size: 25px; }
+.section-title { font-size: 19px; }
+.detail-title { font-size: 32px; }
+.recipe-meta h3 { font-size: 19px; }
+.plan-day-head { font-size: 16.5px; }
+.detail-block h4 { font-size: 20px; }
+.modal-head strong, #modal-title, .ask-title { font-size: 20px; }
+.reco-plan-label, .slot-label, .m-name { } /* 본문 라벨은 기본 산세리프 유지 */
 
 .hidden { display: none !important; }
