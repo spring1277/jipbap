@@ -1,16 +1,16 @@
 :root {
-  --bg: #fff8f0;
-  --card: #ffffff;
-  --ink: #2b2320;
-  --ink-soft: #7a6f68;
-  --line: #f0e4d6;
-  --accent: #e8552d;
-  --accent-soft: #fdeee8;
-  --accent-ink: #b8380f;
-  --header-green: #4caf50;
-  --green: #4a9d5b;
-  --shadow: 0 2px 12px rgba(150, 90, 40, 0.08);
-  --radius: 16px;
+  --bg: #f7f1e6;          /* 크림 */
+  --card: #fffdf8;        /* 아이보리 카드 */
+  --ink: #3a2f26;         /* 딥 브라운 */
+  --ink-soft: #8a7a68;    /* 뮤트 브라운 */
+  --line: #e6dac4;        /* 크라프트 라인 */
+  --accent: #c8794f;      /* 테라코타 (포인트) */
+  --accent-soft: #f3e6d8;
+  --accent-ink: #a25a34;
+  --header-green: #7d9471;/* 세이지 그린 (헤더) */
+  --green: #7d9471;       /* 세이지 (green 버튼) */
+  --shadow: 0 3px 16px rgba(120, 85, 45, 0.10);
+  --radius: 18px;
   --tabbar-h: 62px;
   --header-h: 54px;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -29,6 +29,12 @@ body {
   overscroll-behavior-y: none;
 }
 button { font-family: inherit; cursor: pointer; }
+
+/* 카페 메뉴판 느낌 — 제목은 명조(세리프) */
+.app-header h1, .section-title, .detail-title, .recipe-meta h3,
+.plan-day-head, .modal-head strong, .ask-title, .detail-block h4, #modal-title {
+  font-family: 'Gowun Batang', 'Nanum Myeongjo', 'Batang', Georgia, serif;
+}
 input, textarea, select { font-family: inherit; font-size: 16px; }
 
 /* ===== 헤더 ===== */
@@ -204,7 +210,7 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .member-del {
   position: absolute; top: -4px; right: 6px; z-index: 2;
   width: 22px; height: 22px; border-radius: 50%; border: none;
-  background: #e8552d; color: #fff; font-size: 12px; line-height: 1;
+  background: var(--accent); color: #fff; font-size: 12px; line-height: 1;
   display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
 .member-avatar {
@@ -234,7 +240,7 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .plan-slot .slot-label { font-size: 10.5px; color: var(--ink-soft); font-weight: 700; margin-bottom: 4px; }
 .plan-slot .slot-menu { font-size: 13px; font-weight: 600; }
 .plan-slot .slot-menu.empty { color: #c8bdb2; font-weight: 400; }
-.plan-slot .slot-menu.suggest { color: #2f9e57; font-weight: 600; }
+.plan-slot .slot-menu.suggest { color: #6f8763; font-weight: 600; }
 .plan-slot .slot-sides { font-size: 10.5px; color: #9a8f86; margin-top: 3px; line-height: 1.35; }
 
 /* ===== 폼 / 모달 ===== */
@@ -266,9 +272,9 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); }
 
-.paste-box { background: #f2faf4; border: 1px solid #cfe9d6; border-radius: 12px; padding: 12px; margin-bottom: 18px; }
+.paste-box { background: #f3ece0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 18px; }
 .paste-box label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--ink); }
-.paste-box textarea { width: 100%; border: 1px solid #cfe9d6; border-radius: 10px; padding: 10px 12px; min-height: 108px; resize: vertical; outline: none; line-height: 1.55; background: #fff; }
+.paste-box textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 108px; resize: vertical; outline: none; line-height: 1.55; background: #fff; }
 .paste-box textarea:focus { border-color: var(--header-green); }
 .row-2 { display: flex; gap: 10px; }
 .row-2 .field { flex: 1; }
