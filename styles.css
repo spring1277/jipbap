@@ -7,8 +7,8 @@
   --accent: #e06a34;      /* 선명한 테라코타 */
   --accent-soft: #fce4d3;
   --accent-ink: #b8491a;
-  --header-green: #47a05a;/* 선명한 그린 (헤더) */
-  --green: #47a05a;
+  --header-green: #7d9471;/* 세이지 그린 (헤더) */
+  --green: #7d9471;
   --shadow: 0 3px 16px rgba(120, 80, 40, 0.14);
   --radius: 18px;
   --tabbar-h: 62px;
@@ -23,7 +23,10 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
     "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
   background-color: var(--bg);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.06'/%3E%3C/svg%3E");
+  /* 종이질감: 섬유결(가로결) + 미세 그레인 2겹 */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55 0.045' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.08'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.045'/%3E%3C/svg%3E");
   color: var(--ink);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -31,11 +34,11 @@ body {
 }
 button { font-family: inherit; cursor: pointer; }
 
-/* 카페 메뉴판 느낌 — 제목은 명조(세리프) */
+/* 제목은 고딕체(본문과 동일 시스템 고딕) — 굵게 */
 .app-header h1, .section-title, .detail-title, .recipe-meta h3,
 .plan-day-head, .modal-head strong, .ask-title, .detail-block h4, #modal-title {
-  font-family: 'Nanum Pen Script', 'Gaegu', 'Gowun Batang', cursive, serif;
-  letter-spacing: .3px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
 }
 input, textarea, select { font-family: inherit; font-size: 16px; }
 
@@ -341,14 +344,11 @@ input, textarea, select { font-family: inherit; font-size: 16px; }
 .ask-actions { display: flex; gap: 10px; margin-top: 14px; }
 .ask-actions .btn { flex: 1; }
 
-/* 손글씨 제목 크기 보정 (Nanum Pen Script는 작게 보임) */
-.app-header h1 { font-size: 25px; }
-.section-title { font-size: 19px; }
-.detail-title { font-size: 32px; }
-.recipe-meta h3 { font-size: 19px; }
-.plan-day-head { font-size: 16.5px; }
-.detail-block h4 { font-size: 20px; }
-.modal-head strong, #modal-title, .ask-title { font-size: 20px; }
-.reco-plan-label, .slot-label, .m-name { } /* 본문 라벨은 기본 산세리프 유지 */
+/* 카드에도 은은한 종이 그레인 (전체가 종이처럼 보이도록) */
+.card, .recipe-card, .plan-day, .reco-plan, .modal-sheet, .ask-box {
+  background-color: var(--card);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)' opacity='0.03'/%3E%3C/svg%3E");
+}
+.modal-sheet { background-color: var(--bg); }
 
 .hidden { display: none !important; }
