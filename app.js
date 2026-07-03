@@ -333,6 +333,44 @@ const SIDE_SUGGEST = ['김치', '시금치나물', '콩나물무침', '무생채
 /* 이름 정규화(괄호·공백 제거)로 레시피/추천 간 중복 판정 */
 const normName = (s) => (s || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '').trim();
 
+/* ── 영양사 메뉴 뱅크 (내 레시피와 무관하게 균형 식단 추천) ─────────────
+   p = 단백질 급원: 육(고기)·어(생선/해산물)·난(계란)·두(두부/콩)·유(유제품)·채(채소중심)
+   성장기 어린이 고단백 지향: 메인은 대부분 단백질 급원, 요일마다 급원을 순환해 균형 */
+const BANK_BREAKFAST = [
+  { n: '소고기 야채죽', p: '육' }, { n: '전복죽', p: '어' }, { n: '계란죽', p: '난' },
+  { n: '참치마요 덮밥', p: '어' }, { n: '소고기 볶음밥', p: '육' }, { n: '새우 볶음밥', p: '어' },
+  { n: '김치볶음밥+계란후라이', p: '난' }, { n: '미트 토마토 스파게티', p: '육' }, { n: '크림 스파게티', p: '유' },
+  { n: '치즈 퀘사디아(또띠아)', p: '유' }, { n: '불고기 또띠아랩', p: '육' }, { n: '참치 주먹밥', p: '어' },
+  { n: '소고기 주먹밥', p: '육' }, { n: '떡국(계란지단)', p: '난' }, { n: '프렌치토스트+우유', p: '유' },
+  { n: '계란말이+밥', p: '난' }, { n: '두부 덮밥', p: '두' }, { n: '오트밀+바나나+우유', p: '유' }
+];
+const BANK_DINNER = [
+  { n: '소불고기', p: '육' }, { n: '닭갈비', p: '육' }, { n: '닭볶음탕', p: '육' }, { n: '제육볶음', p: '육' },
+  { n: '돼지고기 김치찌개', p: '육' }, { n: '소고기 미역국', p: '육' }, { n: '소고기 장조림', p: '육' },
+  { n: '등심 돈까스', p: '육' }, { n: '닭가슴살 스테이크', p: '육' }, { n: '안심 스테이크', p: '육' },
+  { n: '갈비찜', p: '육' }, { n: '수육', p: '육' }, { n: '고등어구이', p: '어' }, { n: '삼치구이', p: '어' },
+  { n: '갈치조림', p: '어' }, { n: '코다리조림', p: '어' }, { n: '연어 스테이크', p: '어' },
+  { n: '오징어볶음', p: '어' }, { n: '새우 두부전골', p: '어' }, { n: '된장찌개(두부)', p: '두' },
+  { n: '순두부찌개', p: '두' }, { n: '두부조림', p: '두' }, { n: '콩비지찌개', p: '두' }, { n: '계란찜', p: '난' }
+];
+const BANK_LUNCH = [
+  { n: '비빔밥', p: '채' }, { n: '제육덮밥', p: '육' }, { n: '치킨마요덮밥', p: '육' }, { n: '잔치국수', p: '채' },
+  { n: '김밥', p: '채' }, { n: '카레라이스', p: '육' }, { n: '오므라이스', p: '난' }, { n: '볶음우동', p: '채' },
+  { n: '참치김치볶음밥', p: '어' }, { n: '소고기 콩나물국밥', p: '육' }
+];
+function bankOf(meal) { return meal === 'breakfast' ? BANK_BREAKFAST : meal === 'dinner' ? BANK_DINNER : BANK_LUNCH; }
+/* 곁들임: 채소 반찬 + 단백질 반찬(성장기 칼슘·단백질 보강) */
+const SIDE_VEG = ['시금치나물', '콩나물무침', '무생채', '오이무침', '애호박볶음', '도라지무침', '가지무침', '브로콜리무침', '파프리카볶음', '김구이', '배추김치', '깍두기'];
+const SIDE_PROTEIN = ['계란말이', '두부부침', '메추리알 장조림', '멸치볶음', '진미채무침', '어묵볶음', '콩자반', '검은콩조림', '연근조림'];
+
+/* 뱅크 메뉴 이름이 내 레시피와 맞으면 그 레시피로 연결 */
+function matchRecipe(name) {
+  const n = normName(name);
+  if (!n) return null;
+  const r = state.recipes.find((x) => { const t = normName(x.title); return t && (t === n || t.includes(n) || n.includes(t)); });
+  return r ? r.id : null;
+}
+
 /* 메인 요리 풀 (반찬·간식 제외) — 아침=볶음밥·죽·스파게티·또띠아·주먹밥·떡국 등 */
 function mainPool(meal) {
   const all = state.recipes;
@@ -352,47 +390,62 @@ function refInfo(ref) {
   return null;
 }
 
-/* 일주일 자동 추천 — 끼니마다 '메인' + '곁들임(반찬)'. 메인은 주간 중복 없음 */
-async function recommendWeek() {
-  const meals = state.planMeals;
-  const mainQ = {}, mainSug = {};
-  meals.forEach((m) => { mainQ[m] = shuffle(mainPool(m)); mainSug[m] = shuffle(suggestFor(m)); });
-
-  // 곁들임 덱: 내 반찬 레시피 + 반찬 추천(이름 중복 제외), 섞어서 순환 사용(주중 반복 허용)
-  const sideNames = new Set(sidePool().map((r) => normName(r.title)));
-  const sideDeck = shuffle([...sidePool().map((r) => r.id), ...SIDE_SUGGEST.filter((s) => !sideNames.has(normName(s))).map((s) => ({ s }))]);
-  let sideCur = 0;
-  const nextSide = (exclude) => {
-    for (let n = 0; n < sideDeck.length; n++) {
-      const ref = sideDeck[(sideCur + n) % sideDeck.length];
-      const info = refInfo(ref);
-      if (info && !exclude.has(normName(info.text))) { sideCur = (sideCur + n + 1) % sideDeck.length; return { ref, name: normName(info.text) }; }
+/* 순환 선택기: 덱을 커서로 돌며 exclude에 없는 이름을 반환 */
+function makeRotator(names) {
+  const deck = shuffle(names.slice());
+  let cur = 0;
+  return (exclude) => {
+    for (let n = 0; n < deck.length; n++) {
+      const name = deck[(cur + n) % deck.length];
+      if (!exclude || !exclude.has(normName(name))) { cur = (cur + n + 1) % deck.length; return name; }
     }
     return null;
   };
+}
+
+/* 일주일 자동 추천 — 20년차 영양사 관점: 단백질 급원(고기·생선·두부·계란)을
+   요일마다 순환해 균형을 맞추고, 성장기 고단백 위주로 메인+곁들임을 구성 */
+async function recommendWeek() {
+  const meals = state.planMeals;
+  // 끼니별: 단백질 급원별 그룹 + 급원 순환 순서
+  const setup = {};
+  meals.forEach((m) => {
+    const byType = {};
+    bankOf(m).forEach((it) => { (byType[it.p] = byType[it.p] || []).push(it.n); });
+    Object.keys(byType).forEach((t) => { byType[t] = shuffle(byType[t]); });
+    setup[m] = { byType, order: shuffle(Object.keys(byType)) };
+  });
+  const nextVeg = makeRotator(SIDE_VEG);
+  const nextPro = makeRotator(SIDE_PROTEIN);
+  const sideRef = (name) => matchRecipe(name) || { s: name };
 
   const usedMains = new Set(); // 메인은 일주일 내 중복 없음
   const plan = {};
-  DAYS.forEach((d) => {
+  DAYS.forEach((d, di) => {
     plan[d] = Object.assign({}, state.plan[d]); // 추천에서 뺀 끼니(예: 점심)는 기존 값 유지
     meals.forEach((m) => {
-      let mainRef = null, mainName = null;
-      const r = mainQ[m].find((x) => !usedMains.has(normName(x.title)));
-      if (r) { mainRef = r.id; mainName = normName(r.title); }
-      else { const sug = mainSug[m].find((n) => !usedMains.has(normName(n))); if (sug) { mainRef = { s: sug }; mainName = normName(sug); } }
-      if (mainRef == null) { delete plan[d][m]; return; }
-      usedMains.add(mainName);
-      const sideCount = m === 'dinner' ? 2 : 1;   // 저녁 2가지, 그 외 1가지 곁들임
-      const exclude = new Set([mainName]);
+      const { byType, order } = setup[m];
+      // 단백질 급원을 요일마다 순환 → 주간 균형
+      let mainName = null;
+      for (let k = 0; k < order.length && !mainName; k++) {
+        const cand = (byType[order[(di + k) % order.length]] || []).find((n) => !usedMains.has(normName(n)));
+        if (cand) mainName = cand;
+      }
+      if (!mainName) mainName = Object.values(byType).flat().find((n) => !usedMains.has(normName(n))) || null;
+      if (!mainName) { delete plan[d][m]; return; }
+      usedMains.add(normName(mainName));
+
+      const exclude = new Set([normName(mainName)]);
       const sides = [];
-      for (let k = 0; k < sideCount; k++) { const s = nextSide(exclude); if (s) { sides.push(s.ref); exclude.add(s.name); } }
-      plan[d][m] = { main: mainRef, sides };
+      const veg = nextVeg(exclude); if (veg) { sides.push(sideRef(veg)); exclude.add(normName(veg)); }
+      if (m !== 'breakfast') { const pro = nextPro(exclude); if (pro) { sides.push(sideRef(pro)); exclude.add(normName(pro)); } } // 저녁·점심: 단백질 반찬 추가
+      plan[d][m] = { main: matchRecipe(mainName) || { s: mainName }, sides };
     });
   });
   state.plan = plan;
   await DB.setKV('plan', state.plan);
   render();
-  toast('일주일 식단 추천 완료 🎲 (메인 + 곁들임 반찬)');
+  toast('영양 균형 식단 추천 완료 🥗 (성장기 고단백 위주)');
 }
 
 async function clearWeek() {
